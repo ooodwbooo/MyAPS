@@ -227,7 +227,7 @@ public class SolverController {
         List<Order> orders = new ArrayList<>();
         orders.addAll(ordersTmp);
 
-        for (int i = 0; i < 70; i++) {
+        for (int i = 0; i < 100; i++) {
             orders.add(new Order("Order-" + (i + 1), 10, 45 + (i % 5) * 15,
                     day1.plusDays(i % 3), day3, "Assembly", "Assembly"));
         }

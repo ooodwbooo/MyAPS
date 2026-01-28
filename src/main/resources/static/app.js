@@ -322,6 +322,39 @@
       ordersByKey.get(key).push(o);
     });
 
+    // Build deterministic color palette for the items that colors represent in this view.
+    // - when viewing employees, colors should represent lines
+    // - when viewing lines, colors should represent employees
+    let legendKeys = [];
+    if (mode === 'employee') {
+      legendKeys = Array.from(new Set(orders.map(o => o.line?.name || o.line?.id || '<unassigned>')));
+    } else {
+      legendKeys = Array.from(new Set(orders.map(o => o.employee?.name || o.employee?.id || '<unassigned>')));
+    }
+    // fallback to rows order if empty
+    if (legendKeys.length === 0) {
+      rows.forEach(r => { if (!legendKeys.includes(r.key)) legendKeys.push(r.key); });
+    }
+    const paletteMap = new Map();
+    const n = Math.max(1, legendKeys.length);
+    for (let i = 0; i < legendKeys.length; i++) {
+      const h = Math.round((360 * i) / n);
+      const s = 70; const l1 = 45; const l2 = 35;
+      const c1 = `hsl(${h}deg ${s}% ${l1}%)`;
+      const c2 = `hsl(${(h + 25) % 360}deg ${Math.max(55, s - 10)}% ${l2}%)`;
+      paletteMap.set(legendKeys[i], `linear-gradient(90deg, ${c1} 0%, ${c2} 100%)`);
+    }
+
+    // render legend for current color mapping (labels indicate what colors represent)
+    const legend = document.createElement('div'); legend.className = 'legend';
+    legendKeys.forEach(k => {
+      const item = document.createElement('div'); item.className = 'legend-item';
+      const sw = document.createElement('div'); sw.className = 'legend-swatch'; sw.style.background = paletteMap.get(k);
+      const lbl = document.createElement('div'); lbl.className = 'legend-label'; lbl.textContent = k;
+      item.appendChild(sw); item.appendChild(lbl); legend.appendChild(item);
+    });
+    ganttContainer.appendChild(legend);
+
     // header ticks (daily)
     const header = document.createElement('div'); header.className = 'timeline';
     const label = document.createElement('div'); label.className = 'label'; label.textContent = ''; header.appendChild(label);
@@ -360,18 +393,24 @@
             // compute shift duration in minutes, handle overnight
             let durationMin = Math.round((shiftEndDt.getTime() - shiftStartDt.getTime()) / 60000);
             if (durationMin <= 0) durationMin += 24 * 60;
-            // iterate days from t0 date to t1 date
+            // iterate days from one day before t0 to t1 date to catch overnight shifts starting previous day
             const startDate = new Date(t0);
             startDate.setHours(0, 0, 0, 0);
+            startDate.setDate(startDate.getDate() - 1);
             const endDate = new Date(t1);
             endDate.setHours(0, 0, 0, 0);
             for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
               const shiftDayStart = new Date(day);
               shiftDayStart.setHours(shiftStartDt.getHours(), shiftStartDt.getMinutes(), 0, 0);
               const sMs = shiftDayStart.getTime();
-              const leftMin = Math.round((sMs - t0) / 60000);
-              const leftPx = Math.round(leftMin * pxPerMin * zoomFactor);
-              const widthPx = Math.round(durationMin * pxPerMin * zoomFactor);
+              const eMs = sMs + durationMin * 60000;
+              // skip if completely outside timeline
+              if (eMs <= t0 || sMs >= t1) continue;
+              const visibleStart = Math.max(sMs, t0);
+              const visibleEnd = Math.min(eMs, t1);
+              if (visibleEnd <= visibleStart) continue;
+              const leftPx = Math.round((visibleStart - t0) / 60000 * pxPerMin * zoomFactor);
+              const widthPx = Math.max(2, Math.round((visibleEnd - visibleStart) / 60000 * pxPerMin * zoomFactor));
               const bg = document.createElement('div'); bg.className = 'shift-bg';
               bg.style.left = leftPx + 'px'; bg.style.width = widthPx + 'px';
               bars.appendChild(bg);
@@ -392,9 +431,14 @@
         const bar = document.createElement('div'); bar.className = 'bar';
         bar.style.left = leftPx + 'px';
         bar.style.width = widthPx + 'px';
-        // assign stable color per order
-        const colorKey = o.id || o.productName || (o.productName + '|' + o.quantity);
-        bar.style.background = colorForKey(colorKey);
+        // assign color from computed palette (ensures distinct hues)
+        let colorKey;
+        if (mode === 'employee') {
+          colorKey = o.line?.name || o.line?.id || o.productName || o.id || '<unassigned>';
+        } else {
+          colorKey = o.employee?.name || o.employee?.id || o.productName || o.id || '<unassigned>';
+        }
+        bar.style.background = paletteMap.get(colorKey) || colorForKey(colorKey);
         bar.dataset.detail = JSON.stringify(o);
         bar.title = '';
         bar.textContent = o.productName;

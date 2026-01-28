@@ -7,6 +7,7 @@ import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.Joiners;
+import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 
 import java.time.temporal.ChronoUnit;
 
@@ -18,6 +19,7 @@ public class ShiftScheduleConstraintProvider implements ConstraintProvider {
         // 硬约束
         lineFunctionMatch(constraintFactory),
         employeeSkillMatch(constraintFactory),
+        overtimeMustFollowShiftEnd(constraintFactory),
         orderWithinWindow(constraintFactory),
         uniqueLinePerShift(constraintFactory),
         uniqueEmployeePerShift(constraintFactory),
@@ -26,8 +28,70 @@ public class ShiftScheduleConstraintProvider implements ConstraintProvider {
         // 软约束
         finishEarly(constraintFactory),
         balanceOrdersPerEmployee(constraintFactory),
+        minimizeLineSwitchingPerEmployee(constraintFactory),
         balanceOrdersPerLine(constraintFactory)
     };
+  }
+
+  // 硬约束：如果订单被视为加班且发生在班次结束之后，则加班必须在班次结束后的 15 分钟内开始
+  private Constraint overtimeMustFollowShiftEnd(ConstraintFactory constraintFactory) {
+    final int allowedGapMin = 15;
+    return constraintFactory.forEach(Order.class)
+        .filter(o -> o.getEmployee() != null && o.getScheduledDateTime() != null && o.getEmployee().getShift() != null)
+        .filter(o -> {
+          try {
+            java.time.LocalDateTime orderStart = o.getScheduledDateTime();
+            java.time.LocalDateTime orderEnd = orderStart.plusMinutes(Math.max(1, o.getWorkHours()));
+
+            java.time.LocalTime shiftStartTime = o.getEmployee().getShift().getStart().toLocalTime();
+            java.time.LocalTime shiftEndTime = o.getEmployee().getShift().getEnd().toLocalTime();
+            if (shiftStartTime.equals(shiftEndTime)) {
+              return false; // full-day shift -> no overtime restriction here
+            }
+
+            java.util.function.Function<java.time.LocalDate, java.time.LocalDateTime[]> shiftWindowForDate = (date) -> {
+              java.time.LocalDateTime s = java.time.LocalDateTime.of(date, shiftStartTime);
+              java.time.LocalDateTime e = java.time.LocalDateTime.of(date, shiftEndTime);
+              if (!e.isAfter(s)) {
+                e = e.plusDays(1);
+              }
+              return new java.time.LocalDateTime[] { s, e };
+            };
+
+            // Determine if this order is actually overtime (i.e. not fully inside any shift window)
+            java.time.LocalDate dStart = orderStart.toLocalDate();
+            java.time.LocalDate dPrev = dStart.minusDays(1);
+
+            java.time.LocalDateTime[] wCur = shiftWindowForDate.apply(dStart);
+            java.time.LocalDateTime[] wPrev = shiftWindowForDate.apply(dPrev);
+
+            boolean insideCur = (!orderStart.isBefore(wCur[0]) && !orderEnd.isAfter(wCur[1]));
+            boolean insidePrev = (!orderStart.isBefore(wPrev[0]) && !orderEnd.isAfter(wPrev[1]));
+            if (insideCur || insidePrev) {
+              return false; // not overtime
+            }
+
+            // Find the most recent shift window end that is <= orderStart (prefer current day's end if applicable)
+            java.time.LocalDateTime candidateEnd = null;
+            if (!wPrev[1].isAfter(orderStart)) {
+              candidateEnd = wPrev[1];
+            }
+            if (!wCur[1].isAfter(orderStart) && (candidateEnd == null || wCur[1].isAfter(candidateEnd))) {
+              candidateEnd = wCur[1];
+            }
+            if (candidateEnd == null) {
+              return false; // order not after any known shift end -> don't count as violation here
+            }
+
+            java.time.LocalDateTime latestAllowed = candidateEnd.plusMinutes(allowedGapMin);
+            // Violation when order starts strictly after latestAllowed
+            return orderStart.isAfter(latestAllowed);
+          } catch (Exception ex) {
+            return false;
+          }
+        })
+        .penalize(HardSoftScore.ONE_HARD)
+        .asConstraint("Overtime must start within 15 minutes after shift end");
   }
 
   // 生产线功能必须满足订单需求
@@ -164,7 +228,7 @@ public class ShiftScheduleConstraintProvider implements ConstraintProvider {
   private Constraint finishEarly(ConstraintFactory constraintFactory) {
     return constraintFactory.forEach(Order.class)
         .filter(o -> o.getScheduledDateTime() != null && o.getEarliestDate() != null)
-        .penalize(HardSoftScore.ONE_SOFT, o -> (int) Math.max(0,
+        .penalize(HardSoftScore.ofSoft(20), o -> (int) Math.max(0,
             ChronoUnit.DAYS.between(o.getEarliestDate(), o.getScheduledDateTime().toLocalDate())))
         .asConstraint("Finish orders as early as possible");
   }
@@ -176,6 +240,17 @@ public class ShiftScheduleConstraintProvider implements ConstraintProvider {
         .filter((o1, o2) -> o1 != o2 && o1.getEmployee() != null)
         .penalize(HardSoftScore.ONE_SOFT)
         .asConstraint("Balance orders across employees");
+  }
+
+  // 软约束：同一员工在同一天尽量不要更换生产线（若当天使用了 N 条不同产线，则惩罚 N-1 次）
+  private Constraint minimizeLineSwitchingPerEmployee(ConstraintFactory constraintFactory) {
+    return constraintFactory.forEach(Order.class)
+        .filter(o -> o.getEmployee() != null && o.getScheduledDateTime() != null)
+        .groupBy(o -> o.getEmployee(), o -> o.getScheduledDateTime().toLocalDate(),
+            ConstraintCollectors.toSet(Order::getLine))
+        .filter((employee, date, lineSet) -> lineSet != null && lineSet.size() > 1)
+        .penalize(HardSoftScore.ofSoft(50), (employee, date, lineSet) -> lineSet.size() - 1)
+        .asConstraint("Minimize employee switching lines per day");
   }
 
   // 软约束：尽量均衡分配订单给生产线
