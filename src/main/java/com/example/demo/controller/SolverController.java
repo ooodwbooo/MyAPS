@@ -65,8 +65,8 @@ public class SolverController {
 
         SolverConfigOverride<OrderSchedule> withTerminationConfig = new SolverConfigOverride<OrderSchedule>()
                 .withTerminationConfig(new TerminationConfig()
-                        .withSpentLimit(Duration.ofSeconds(60))
-                        .withBestScoreLimit("0hard/10soft"));
+                        .withSpentLimit(Duration.ofSeconds(300))
+                        .withBestScoreLimit("0hard/-10soft"));
 
         solverManager.solveBuilder()
                 .withProblemId(jobId)
@@ -79,8 +79,8 @@ public class SolverController {
                 .withBestSolutionEventConsumer(event -> {
                     log.info("+++++++++ Best +++++++++");
                     jobIdToJob.put(jobId, Job.ofSchedule(event.solution()));
-                    log.info("Found better solution: {}", event.solution().getScore());
-                    printSolution(event.solution());
+                    log.info("Found better score: {}", event.solution().getScore());
+                    // printSolution(event.solution());
                     log.info("=========================");
                 })
                 .withFinalBestSolutionEventConsumer(event -> {
