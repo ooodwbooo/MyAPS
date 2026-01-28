@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>排程甘特视图</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>排程可视化（产线 / 员工）</h1>
+      <div class="controls">
+        <button id="startBtn">开始求解</button>
+        <button id="stopBtn" disabled>停止求解</button>
+        <label>轮询间隔：<select id="pollInterval"><option value="2000">2s</option><option value="5000">5s</option><option value="10000">10s</option></select></label>
+        <label>刷新策略：<select id="refreshMode"><option value="onlyWhenSolving">仅在求解时刷新</option><option value="always">一直刷新</option></select></label>
+      </div>
+    </header>
+
+    <section class="status">
+      <div>JobId: <span id="jobId">-</span></div>
+      <div>状态: <span id="solverStatus">-</span></div>
+      <div>得分: <span id="score">-</span></div>
+      <div>最近更新时间: <span id="updated">-</span></div>
+    </section>
+
+    <section class="view-controls">
+      <label>视角: <select id="viewMode"><option value="line">产线视角</option><option value="employee">员工视角</option></select></label>
+      <label>选择 job: <select id="jobSelect"></select></label>
+      <button id="refreshBtn">刷新</button>
+      <label>缩放: <button id="zoomOut">-</button> <span id="zoomDisplay">100%</span> <button id="zoomIn">+</button></label>
+    </section>
+
+    <section id="ganttContainer" class="gantt"></section>
+
+    <section id="analysis" class="analysis">
+      <h2>结果分析</h2>
+      <div id="summary" class="summary"></div>
+      <div id="charts" class="charts"></div>
+      <div id="scoreAnalysis" class="score-analysis small"></div>
+    </section>
+
+    <footer>
+      <small>提示：页面通过轮询后端 `/schedules/{jobId}` 获取最新方案数据。条宽按分钟缩放。</small>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+:root{--timeline-width:1100px;--row-height:36px;--label-width:160px;--bar-color:#1976d2;--bar-alpha:0.85}
+*{box-sizing:border-box;font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif}
+body{margin:0;background:#f6f8fa;color:#111}
+.app{max-width:1280px;margin:12px auto;padding:12px}
+header{display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:18px}
+.controls button{margin-right:8px;padding:6px 10px}
+.status{display:flex;gap:16px;padding:8px 0}
+.view-controls{display:flex;gap:12px;align-items:center;padding:8px 0}
+.gantt{border:1px solid #ddd;background:#fff;padding:8px;overflow:auto}
+.gantt .timeline{display:flex;align-items:center}
+.gantt .row{display:flex;align-items:center;height:var(--row-height);border-bottom:1px solid #f0f0f0}
+.gantt .label{width:var(--label-width);padding:6px;font-size:13px}
+.gantt .bars{position:relative;height:100%;width:var(--timeline-width);border-left:1px solid #eee}
+.gantt .time-ticks{display:flex}
+.gantt .tick{width:60px;text-align:center;color:#666;font-size:12px}
+.bar{position:absolute;height:22px;border-radius:4px;background:linear-gradient(90deg, rgba(25,118,210,var(--bar-alpha)) 0%, rgba(2,136,209,0.9) 100%);color:#fff;padding:2px 6px;font-size:12px;overflow:hidden;white-space:nowrap}
+.shift-bg{position:absolute;top:4px;height:28px;background:rgba(100,100,100,0.12);border-radius:4px;pointer-events:none;}
+.legend{display:flex;gap:8px;padding:8px 0}
+.small{font-size:12px;color:#666}
+
+.analysis{margin-top:16px;background:#fff;border:1px solid #eee;padding:12px}
+.analysis h2{margin:0 0 8px 0;font-size:16px}
+.summary{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.summary .item{background:#f3f6fb;padding:8px;border-radius:6px}
+.charts{display:flex;gap:12px;flex-wrap:wrap}
+.charts .panel{min-width:220px;background:#fafafa;border:1px solid #f0f0f0;padding:8px;border-radius:6px}
+.score-analysis{margin-top:8px}
+
+/* tooltip for gantt bars */
+#ganttTooltip{position:fixed;pointer-events:none;background:rgba(0,0,0,0.85);color:#fff;padding:8px;border-radius:6px;font-size:13px;max-width:320px;z-index:9999;display:none}
+.zoom-controls button{padding:4px 8px;margin:0 4px}
