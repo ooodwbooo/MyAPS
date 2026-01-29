@@ -11,41 +11,57 @@ import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 
 import java.time.temporal.ChronoUnit;
 
-public class ShiftScheduleConstraintProvider implements ConstraintProvider {
+/**
+ * 排班约束提供者类，用于定义和实现各种排班相关的约束条件
+ * 该类实现了ConstraintProvider接口，用于提供各种硬约束、中约束和软约束
+ */
+public class OrderScheduleConstraintProvider implements ConstraintProvider {
 
   @Override
   public Constraint[] defineConstraints(ConstraintFactory constraintFactory) {
     return new Constraint[] {
-        // 硬约束
-        lineFunctionMatch(constraintFactory),
-        employeeSkillMatch(constraintFactory),
-        overtimeMustFollowShiftEnd(constraintFactory),
-        orderWithinWindow(constraintFactory),
-        uniqueLinePerShift(constraintFactory),
-        uniqueEmployeePerShift(constraintFactory),
+        // 硬约束：必须满足的基本约束条件
+        lineFunctionMatch(constraintFactory),      // 生产线功能匹配约束
+        employeeSkillMatch(constraintFactory),     // 员工技能匹配约束
+        overtimeMustFollowShiftEnd(constraintFactory), // 加班时间约束
+        orderWithinWindow(constraintFactory),     // 订单时间窗口约束
+        uniqueLinePerShift(constraintFactory),     // 生产线唯一性约束
+        uniqueEmployeePerShift(constraintFactory), // 员工唯一性约束
         // 中约束（用较大权重的软约束来表达）
-        minimizeOvertime(constraintFactory),
-        // 软约束
-        finishEarly(constraintFactory),
-        balanceOrdersPerEmployee(constraintFactory),
-        minimizeLineSwitchingPerEmployee(constraintFactory),
-        minimizeIdleTimePerShift(constraintFactory),
-        balanceOrdersPerLine(constraintFactory)
+        minimizeOvertime(constraintFactory),       // 最小化加班约束
+        // 软约束：优化目标，可以适当违反
+        finishEarly(constraintFactory),            // 尽早完成约束
+        balanceOrdersPerEmployee(constraintFactory), // 均衡分配订单给员工
+        minimizeLineSwitchingPerEmployee(constraintFactory), // 最小化生产线切换
+        minimizeIdleTimePerShift(constraintFactory), // 最小化空闲时间
+        balanceOrdersPerLine(constraintFactory)    // 均衡分配订单给生产线
     };
   }
 
   // 硬约束：如果订单被视为加班且发生在班次结束之后，则加班必须在班次结束后立刻开始
+  /**
+   * 创建一个约束，确保加班必须在班次结束后开始，并且班次结束后与加班开始之间最多允许5分钟的间隔
+   * @param constraintFactory 约束工厂，用于创建约束
+   * @return 配置好的约束，用于验证加班时间规则
+   */
   private Constraint overtimeMustFollowShiftEnd(ConstraintFactory constraintFactory) {
+    // 允许的班次结束与加班开始之间的最小间隔时间（分钟）
     final int allowedGapMin = 5;
+    // 创建约束，遍历所有订单
     return constraintFactory.forEach(Order.class)
+        // 过滤条件：订单必须有员工、计划日期时间，且员工的班次不能为空
         .filter(o -> o.getEmployee() != null && o.getScheduledDateTime() != null && o.getEmployee().getShift() != null)
+        // 应用复杂的过滤逻辑，检查加班时间是否符合规则
         .filter(o -> {
           try {
+            // 获取订单的开始时间和结束时间（工作小时数至少为1分钟）
             java.time.LocalDateTime orderStart = o.getScheduledDateTime();
             java.time.LocalDateTime orderEnd = orderStart.plusMinutes(Math.max(1, o.getWorkHours()));
 
+            // 获取班次的开始和结束时间
             java.time.LocalTime shiftStartTime = o.getEmployee().getShift().getStart().toLocalTime();
             java.time.LocalTime shiftEndTime = o.getEmployee().getShift().getEnd().toLocalTime();
+            // 如果班次开始和结束时间相同，表示全天班次，在此不限制加班
             if (shiftStartTime.equals(shiftEndTime)) {
               return false; // full-day shift -> no overtime restriction here
             }
