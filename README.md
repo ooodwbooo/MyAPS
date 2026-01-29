@@ -2,7 +2,7 @@
 
 简要说明
 --
-MyAPS 是一个使用 Spring Boot + Timefold（类似 OptaPlanner）实现的订单排班求解示例项目。后端通过 REST 接口接收求解请求，使用 `SolverManager` 管理异步求解任务，约束在 `ConstraintProvider` 中定义并返回 `HardSoftScore`。
+MyAPS 是一个使用 Spring Boot + Timefold（类似 OptaPlanner）实现的订单排班求解示例项目。后端通过 REST 接口接收求解请求，使用 `SolverManager` 管理异步求解任务，约束在 `ConstraintProvider` 中定义并返回 `HardMediumSoftScore`。
 
 先决条件
 --
@@ -78,7 +78,7 @@ curl -X POST -H "Content-Type: application/json" http://localhost:8080/schedules
 项目特有约定与注意事项
 --
 - Timefold 要求：保持 `@PlanningSolution` / `@PlanningEntity` / `@PlanningVariable` 注解以及实体的无参构造函数；修改实体请确保 Jackson/Lombok 兼容。
-- 评分类型：使用 `HardSoftScore`，约束在 `ShiftScheduleConstraintProvider` 中实现。
+- 评分类型：使用 `HardMediumSoftScore`，约束在 `ShiftScheduleConstraintProvider` 中实现。
 - `SolverController` 的 `jobIdToJob` 内存缓存上限为 2（资源保护）。如需扩展为持久化缓存，请注意并发与生命周期管理。
 
 开发建议与修改指引

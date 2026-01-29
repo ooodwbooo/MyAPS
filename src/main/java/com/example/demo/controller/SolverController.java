@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
 import ai.timefold.solver.core.api.score.analysis.ScoreAnalysis;
-import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
+import ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore;
 import ai.timefold.solver.core.api.solver.ScoreAnalysisFetchPolicy;
 import ai.timefold.solver.core.api.solver.SolutionManager;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
@@ -38,12 +38,12 @@ public class SolverController {
     private static final int MAX_JOBS_CACHE_SIZE = 2;
 
     private final SolverManager<OrderSchedule, String> solverManager;
-    private final SolutionManager<OrderSchedule, HardSoftScore> solutionManager;
+    private final SolutionManager<OrderSchedule, HardMediumSoftScore> solutionManager;
     private final ConcurrentMap<String, Job> jobIdToJob = new ConcurrentHashMap<>();
 
     // @Autowired
     public SolverController(SolverManager<OrderSchedule, String> solverManager,
-            SolutionManager<OrderSchedule, HardSoftScore> solutionManager) {
+            SolutionManager<OrderSchedule, HardMediumSoftScore> solutionManager) {
         this.solverManager = solverManager;
         this.solutionManager = solutionManager;
     }
@@ -66,7 +66,7 @@ public class SolverController {
         SolverConfigOverride<OrderSchedule> withTerminationConfig = new SolverConfigOverride<OrderSchedule>()
                 .withTerminationConfig(new TerminationConfig()
                         .withSpentLimit(Duration.ofSeconds(300))
-                        .withBestScoreLimit("0hard/-10soft"));
+                        .withBestScoreLimit("0hard/0medium/0soft"));
 
         solverManager.solveBuilder()
                 .withProblemId(jobId)
@@ -129,7 +129,7 @@ public class SolverController {
     }
 
     @PutMapping(path = "analyze", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ScoreAnalysis<HardSoftScore> analyze(@RequestBody OrderSchedule problem,
+    public ScoreAnalysis<HardMediumSoftScore> analyze(@RequestBody OrderSchedule problem,
             @RequestParam(required = false) ScoreAnalysisFetchPolicy fetchPolicy) {
         return fetchPolicy == null ? solutionManager.analyze(problem) : solutionManager.analyze(problem, fetchPolicy);
     }
@@ -176,6 +176,7 @@ public class SolverController {
         LocalDate day1 = LocalDate.of(2030, 4, 1);
         LocalDate day2 = LocalDate.of(2030, 4, 2);
         LocalDate day3 = LocalDate.of(2030, 4, 3);
+        LocalDate day4 = LocalDate.of(2030, 4, 4);
 
         // 三班倒：早班 / 中班 / 夜班（夜班跨到次日）
         Shift s1 = new Shift(day1.atTime(6, 0), day1.atTime(14, 0), "Morning");
@@ -200,10 +201,10 @@ public class SolverController {
         Line line3 = new Line("L3", List.of("Cutting", "Assembly", "Welding"));
         List<Line> lines = List.of(line1, line2, line3);
 
-        // dateTimes 值域：从 day1 到 day3（含）按 TimeGrain 生成每个 15 分钟时间槽（与班次无关）
+        // dateTimes 值域：从 day1 到 day4（含）按 TimeGrain 生成每个 15 分钟时间槽（与班次无关）
         List<java.time.LocalDateTime> dateTimes = new java.util.ArrayList<>();
-        java.time.LocalDateTime slot = day1.atStartOfDay();
-        java.time.LocalDateTime endSlot = day3.atTime(23, 45); // 最后一个 15 分钟槽为 23:45
+        java.time.LocalDateTime slot = day1.atTime(6, 00);
+        java.time.LocalDateTime endSlot = day4.atTime(5, 45); // 最后一个 15 分钟槽为 23:45
         while (!slot.isAfter(endSlot)) {
             dateTimes.add(slot);
             slot = slot.plusMinutes(com.example.demo.entity.TimeGrain.GRAIN_LENGTH_IN_MINUTES);
@@ -222,6 +223,17 @@ public class SolverController {
         Order o10 = new Order("Widget-J", 15, 10, day1, day1, "Assembly", "Assembly");
         Order o11 = new Order("Widget-K", 70, 60, day3, day3, "Welding", "Welding");
         Order o12 = new Order("Widget-L", 5, 15, day1, day3, "Cutting", "Cutting");
+        
+        // 示例：把 o1、o2 固定到指定员工/产线/时间
+        o1.setEmployee(e1);
+        o1.setLine(line1);
+        o1.setScheduledDateTime(day1.atTime(8,0));
+        o1.setPinned(true);
+
+        o2.setEmployee(e2);
+        o2.setLine(line2);
+        o2.setScheduledDateTime(day1.atTime(9,30));
+        o2.setPinned(true);
 
         List<Order> ordersTmp = List.of(o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11, o12);
         List<Order> orders = new ArrayList<>();

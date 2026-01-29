@@ -3,7 +3,7 @@
 目的：让 AI 编码代理能快速理解并安全修改本项目（Spring Boot + Timefold 排班求解示例）。
 
 要点速览
-- 架构：Spring Boot 应用，Timefold（OptaPlanner 风格）用于排班求解。REST 层接受求解请求 -> `SolverManager` 管理任务 -> `ConstraintProvider` 定义约束并返回 `HardSoftScore`。
+- 架构：Spring Boot 应用，Timefold（OptaPlanner 风格）用于排班求解。REST 层接受求解请求 -> `SolverManager` 管理任务 -> `ConstraintProvider` 定义约束并返回 `HardMediumSoftScore`。
 - 主要组件与位置：
   - 控制器：`src/main/java/com/example/demo/controller/SolverController.java`（REST 接口、jobId 缓存、求解生命周期覆盖）
   - 约束：`src/main/java/com/example/demo/constraint/ShiftScheduleConstraintProvider.java`
@@ -33,7 +33,7 @@
 
 核心约定（必须遵守）
 - Timefold 要求：保留 `@PlanningSolution` / `@PlanningEntity` / `@PlanningVariable` / `@ValueRangeProvider` 注解以及实体的无参构造函数（Lombok 正常保留即可）。
-- 评分使用 `HardSoftScore`；约束一般用 ConstraintFactory 的 join/filter/penalize 模式实现（参见 `ShiftScheduleConstraintProvider`）。
+- 评分使用 `HardMediumSoftScore`；约束一般用 ConstraintFactory 的 join/filter/penalize 模式实现（参见 `ShiftScheduleConstraintProvider`）。
 
 重要实现/修改指引（项目特有）
 - 求解参数与短期试验：优先通过 `SolverConfigOverride`（在 `SolverController`）临时覆盖终止条件（`spentLimit`, `bestScoreLimit` 等），而非修改全局 solver config。

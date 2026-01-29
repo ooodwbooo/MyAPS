@@ -1,6 +1,7 @@
 package com.example.demo.entity;
 
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
+import ai.timefold.solver.core.api.domain.entity.PlanningPin;
 import ai.timefold.solver.core.api.domain.variable.PlanningVariable;
 import lombok.Data;
 
@@ -30,6 +31,17 @@ public class Order {
 
     @PlanningVariable(valueRangeProviderRefs = {"dateTimes"})
     private LocalDateTime scheduledDateTime;
+
+    private boolean pinned = false;
+
+    @PlanningPin
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
 
     public Order() {
     }
