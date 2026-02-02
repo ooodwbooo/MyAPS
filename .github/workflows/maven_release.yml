@@ -20,7 +20,8 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write  # 允许创建/推送Git Tag、创建Release、上传产物
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 17
